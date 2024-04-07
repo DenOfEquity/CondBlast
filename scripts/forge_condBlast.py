@@ -48,53 +48,36 @@ class CondBlastForge(scripts.Script):
     def denoiser_callback(self, params):
 #        torch.manual_seed(int(time.time()))     #   this is probably wrong, makes results non-deterministic as this seed will be lost
                                                 #   but good for testing
-        pos = params.text_cond
-        neg = params.text_uncond
-        is_SDXL = isinstance (pos, dict)
-        #   positive conds
-        if params.sampling_step >= self.shufflePos * params.total_sampling_steps:
-            if is_SDXL:
-                vector, cross = pos['vector'], pos['crossattn']
-                indexes = torch.randperm(vector.size(1))
-                params.text_cond['vector'] = vector[:, indexes]
-                indexes = torch.randperm(cross.size(1))
-                params.text_cond['crossattn'] = cross[:, indexes]
+
+        is_SDXL = isinstance (params.text_cond, dict)
+
+        if is_SDXL:
+            pos = params.text_cond
+            neg = params.text_uncond
+
+            #   shuffle conds
+            if params.sampling_step >= self.shufflePos * params.total_sampling_steps:
+                vector, cross = pos['vector'][0], pos['crossattn'][0]
+                indexes = torch.randperm(vector.size(0))
+                params.text_cond['vector'][0] = vector[indexes]
+                indexes = torch.randperm(cross.size(0))
+                params.text_cond['crossattn'][0] = cross[indexes]
                 del vector, cross, indexes
-            else:
-                indexes = torch.randperm(pos.size(1))
-                params.text_cond = pos[:, indexes]
-                del indexes
 
-                if self.scalePos == 1.0:   #   filthy hack
-                    self.scalePos = 0.999
-
-        #negative conds
-        if params.sampling_step >= self.shuffleNeg * params.total_sampling_steps:
-            if is_SDXL:
-                vector, cross = neg['vector'], neg['crossattn']
-                indexes = torch.randperm(vector.size(1))
-                params.text_uncond['vector'] = vector[:, indexes]
-                indexes = torch.randperm(cross.size(1))
-                params.text_uncond['crossattn'] = cross[:, indexes]
+            if params.sampling_step >= self.shuffleNeg * params.total_sampling_steps:
+                vector, cross = neg['vector'][0], neg['crossattn'][0]
+                indexes = torch.randperm(vector.size(0))
+                params.text_uncond['vector'][0] = vector[indexes]
+                indexes = torch.randperm(cross.size(0))
+                params.text_uncond['crossattn'][0] = cross[indexes]
                 del vector, cross, indexes
-            else:
-                indexes = torch.randperm(neg.size(1))
-                params.text_uncond = neg[:, indexes]
-                del indexes
 
-                if self.scaleNeg == 1.0:
-                    self.scaleNeg = 0.999
+            pos = params.text_cond
+            neg = params.text_uncond
 
-
-#for sdxl: works
-#for sd: the shuffle works, but results don't change: seems like cached values?
-#the lerp later makes it work (not if weight is 1.0, probably lerp function catches that case to avoid work?)
-
-        pos = params.text_cond
-        if self.scalePos != 1.0:
-#            is_SDXL = isinstance (pos, dict)
-            if is_SDXL:
-                cond, cross = pos['vector'], pos['crossattn']
+            #   weight
+            if self.scalePos != 1.0:
+                cond, cross = pos['vector'][0], pos['crossattn'][0]
                 empty_cond, empty_cross = self.empty_cond['vector'], self.empty_cond['crossattn']
                 empty_cond.resize_as_(cond)
                 empty_cross.resize_as_(cross)
@@ -102,20 +85,13 @@ class CondBlastForge(scripts.Script):
                 empty_cross = torch.reshape(empty_cross, cross.shape)
                 torch.lerp(empty_cond, cond, self.scalePos, out=cond)
                 torch.lerp(empty_cross, cross, self.scalePos, out=cross)
-                params.text_cond['vector'] = cond
-                params.text_cond['crossattn'] = cross
+                params.text_cond['vector'][0] = cond
+                params.text_cond['crossattn'][0] = cross
                 del cond, cross, empty_cond, empty_cross
-            else:
-                self.empty_cond.resize_as_(pos)
-                self.empty_cond = torch.reshape(self.empty_cond, pos.shape)
-                torch.lerp(self.empty_cond, pos, self.scalePos, out=params.text_cond)
-        del pos
+#            del pos
 
-        neg = params.text_uncond
-        if self.scaleNeg != 1.0:
-#            is_SDXL = isinstance (neg, dict)
-            if is_SDXL:
-                uncond, cross = neg['vector'], neg['crossattn']
+            if self.scaleNeg != 1.0:
+                uncond, cross = neg['vector'][0], neg['crossattn'][0]
                 empty_uncond, empty_cross = self.empty_uncond['vector'], self.empty_uncond['crossattn']
                 empty_uncond.resize_as_(uncond)
                 empty_cross.resize_as_(cross)
@@ -123,18 +99,65 @@ class CondBlastForge(scripts.Script):
                 empty_cross = torch.reshape(empty_cross, cross.shape)
                 torch.lerp(empty_uncond, uncond, self.scaleNeg, out=uncond)
                 torch.lerp(empty_cross, cross, self.scaleNeg, out=cross)
-                params.text_uncond['vector'] = uncond
-                params.text_uncond['crossattn'] = cross
+                params.text_uncond['vector'][0] = uncond
+                params.text_uncond['crossattn'][0] = cross
                 del uncond, cross, empty_uncond, empty_cross
-            else:
-                #   first, reduce the size to match uncond
-                self.empty_uncond.resize_as_(neg)
-                #   second, reshape to match uncond
-                self.empty_uncond = torch.reshape(self.empty_uncond, neg.shape)
-               #   third lerp; .text_uncond is fresh each step so no worries about repeat processing
-                torch.lerp(self.empty_uncond, neg, self.scaleNeg, out=params.text_uncond)
+#            del neg
 
-        del neg
+            #   batch: copy shuffled/scaled results
+            i = 1
+            while i < len(params.text_cond['vector']):
+                params.text_cond['vector'][i] = params.text_cond['vector'][0]
+                params.text_cond['crossattn'][i] = params.text_cond['crossattn'][0]
+                params.text_uncond['vector'][i] = params.text_uncond['vector'][0]
+                params.text_uncond['crossattn'][i] = params.text_uncond['crossattn'][0]
+                i += 1
+
+        else:   #   not sdXL
+            pos = params.text_cond[0]
+            neg = params.text_uncond[0]
+
+            #   shuffle
+            if params.sampling_step >= self.shufflePos * params.total_sampling_steps:
+                indexes = torch.randperm(pos.size(0))
+                params.text_cond[0] = pos[indexes]
+                del indexes
+
+                if self.scalePos == 1.0:   #   filthy hack
+                    self.scalePos = 0.999
+
+            if params.sampling_step >= self.shuffleNeg * params.total_sampling_steps:
+                indexes = torch.randperm(neg.size(0))
+                params.text_uncond[0] = neg[indexes]
+                del indexes
+
+                if self.scaleNeg == 1.0:
+                    self.scaleNeg = 0.999
+
+            pos = params.text_cond[0]
+            neg = params.text_uncond[0]
+
+            #   weight
+            if self.scalePos != 1.0:
+                empty = self.empty_cond
+                empty.resize_as_(pos)
+                empty = torch.reshape(empty, pos.shape)
+                torch.lerp(empty, pos, self.scalePos, out=params.text_cond[0])
+                del empty
+#            del pos
+
+            if self.scaleNeg != 1.0:
+                self.empty_uncond.resize_as_(neg)
+                self.empty_uncond = torch.reshape(self.empty_uncond, neg.shape)
+                torch.lerp(self.empty_uncond, neg, self.scaleNeg, out=params.text_uncond[0])
+#            del neg
+
+            #   batch: copy shuffled/scaled results
+            i = 1
+            while i < len(params.text_cond):
+                params.text_cond[i] = params.text_cond[0]
+                params.text_uncond[i] = params.text_uncond[0]
+                i += 1
 
 
 
@@ -160,7 +183,7 @@ class CondBlastForge(scripts.Script):
         params.extra_generation_params.update(dict(
             cb_enabled = enabled,
             cb_shufflePos = shufflePos,
-            cb_shuffleNeg = shufflePos,
+            cb_shuffleNeg = shuffleNeg,
             cb_scalePos = scalePos,
             cb_scaleNeg = scaleNeg,
         ))
@@ -169,6 +192,10 @@ class CondBlastForge(scripts.Script):
         self.empty_uncond = shared.sd_model.get_learned_conditioning(prompt)
         prompt = SdConditioning([""], is_negative_prompt=False, width=params.width, height=params.height)
         self.empty_cond = shared.sd_model.get_learned_conditioning(prompt)
+
+#   can't weight the conditionings here because of prompt editing?
+
+        
 
         on_cfg_denoiser(self.denoiser_callback)
 
