@@ -50,13 +50,14 @@ class CondBlastForge(scripts.Script):
                                                 #   but good for testing
 
         is_SDXL = isinstance (params.text_cond, dict)
+        lastStep = params.total_sampling_steps - 1
 
         if is_SDXL:
             pos = params.text_cond
             neg = params.text_uncond
 
             #   shuffle conds
-            if params.sampling_step >= self.shufflePos * params.total_sampling_steps:
+            if params.sampling_step >= self.shufflePos * lastStep:
                 vector, cross = pos['vector'][0], pos['crossattn'][0]
                 indexes = torch.randperm(vector.size(0))
                 params.text_cond['vector'][0] = vector[indexes]
@@ -64,7 +65,7 @@ class CondBlastForge(scripts.Script):
                 params.text_cond['crossattn'][0] = cross[indexes]
                 del vector, cross, indexes
 
-            if params.sampling_step >= self.shuffleNeg * params.total_sampling_steps:
+            if params.sampling_step >= self.shuffleNeg * lastStep:
                 vector, cross = neg['vector'][0], neg['crossattn'][0]
                 indexes = torch.randperm(vector.size(0))
                 params.text_uncond['vector'][0] = vector[indexes]
@@ -118,7 +119,7 @@ class CondBlastForge(scripts.Script):
             neg = params.text_uncond[0]
 
             #   shuffle
-            if params.sampling_step >= self.shufflePos * params.total_sampling_steps:
+            if params.sampling_step >= self.shufflePos * lastStep:
                 indexes = torch.randperm(pos.size(0))
                 params.text_cond[0] = pos[indexes]
                 del indexes
@@ -126,7 +127,7 @@ class CondBlastForge(scripts.Script):
                 if self.scalePos == 1.0:   #   filthy hack
                     self.scalePos = 0.999
 
-            if params.sampling_step >= self.shuffleNeg * params.total_sampling_steps:
+            if params.sampling_step >= self.shuffleNeg * lastStep:
                 indexes = torch.randperm(neg.size(0))
                 params.text_uncond[0] = neg[indexes]
                 del indexes
