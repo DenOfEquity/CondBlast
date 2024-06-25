@@ -13,8 +13,12 @@ Each step from that point will receive a new shuffle.
 Scaling the text conditionings is based on the idea on the idea of the [Negative Prompt Weight extension by muerrilla](https://github.com/muerrilla/stable-diffusion-NPW).
 
 ---
-## To do ##
-1. override seed for shuffling - would lead to unrepeatable results unless also save/restore that seed. Not sure this has value.
+#### update 25/06/2024 ####
+corrected location to write extra generation params, now they get added to *params.txt* too
+
+added option to zero text conds after number of steps
+
+
 ---
 ## License ##
 Public domain. Unlicense. Free to a good home.
