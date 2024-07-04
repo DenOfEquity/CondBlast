@@ -27,178 +27,196 @@ class CondBlastForge(scripts.Script):
             with gr.Row():
                 enabled = gr.Checkbox(value=False, label='Enabled')
             with gr.Row():
-                shufflePos = gr.Slider(minimum=0.0, maximum=1.01, step=0.01, value=1.01, label='start step to shuffle positive text conds')
-                shuffleNeg = gr.Slider(minimum=0.0, maximum=1.01, step=0.01, value=1.01, label='start step to shuffle negative text conds')
+                shufflePos = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=1.0, label='shuffle positive text conds after step')
+                shuffleNeg = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=1.0, label='shuffle negative text conds after step')
+            with gr.Row():
+                noisePos = gr.Slider(minimum=0.0, maximum=0.2, step=0.001, value=0.0, label='add noise to positive text conds')
+                noiseNeg = gr.Slider(minimum=0.0, maximum=0.2, step=0.001, value=0.0, label='add noise to negative text conds')
             with gr.Row():
                 scalePos = gr.Slider(minimum=0.1, maximum=2.0, step=0.005, value=1.0, label='positive prompt weight')
                 scaleNeg = gr.Slider(minimum=0.1, maximum=2.0, step=0.005, value=1.0, label='negative prompt weight')
             with gr.Row():
-                zeroPos = gr.Slider(minimum=0.0, maximum=1.01, step=0.01, value=1.01, label='step to zero positive text conds')
-                zeroNeg = gr.Slider(minimum=0.0, maximum=1.01, step=0.01, value=1.01, label='step to zero negative text conds')
+                zeroPos  = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=1.0, label='empty positive after step')
+                zeroNegS = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=1.0, label='empty negative before step')
+                zeroNegE = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=1.0, label='empty negative after step')
 
         self.infotext_fields = [
             (enabled, lambda d: enabled.update(value=("cb_enabled" in d))),
             (shufflePos, "cb_shufflePos"),
             (shuffleNeg, "cb_shuffleNeg"),
+            (noisePos, "cb_noisePos"),
+            (noiseNeg, "cb_noiseNeg"),
             (scalePos, "cb_scalePos"),
             (scaleNeg, "cb_scaleNeg"),
             (zeroPos, "cb_zeroPos"),
-            (zeroNeg, "cb_zeroNeg"),
+            (zeroNegS, "cb_zeroNegS"),
+            (zeroNegE, "cb_zeroNegE"),
         ]
 
-        return enabled, shufflePos, shuffleNeg, scalePos, scaleNeg, zeroPos, zeroNeg
-
+        return enabled, shufflePos, shuffleNeg, noisePos, noiseNeg, scalePos, scaleNeg, zeroPos, zeroNegS, zeroNegE
+#add empty neg before step
+#shuffle pos continues to be ineffective
     @torch.no_grad()
     def denoiser_callback(self, params):
-#        torch.manual_seed(int(time.time()))     #   this is probably wrong, makes results non-deterministic as this seed will be lost
-                                                #   but good for testing
-
         is_SDXL = isinstance (params.text_cond, dict)
         lastStep = params.total_sampling_steps - 1
+        batchSize = len(params.text_cond['vector']) if is_SDXL else len(params.text_cond)
         
+#   is it correct to shuffle/weight the cross-attention?
+
+#shuffle messes up sdxl - maybe clips are cat'd, shuffle blends across?
+#mat crossattn need to match
+
         if is_SDXL:
-            pos = params.text_cond
-            neg = params.text_uncond
-
-            #   shuffle conds
-            if params.sampling_step >= self.shufflePos * lastStep:
-                vector, cross = pos['vector'][0], pos['crossattn'][0]
-                indexes = torch.randperm(vector.size(0))
-                params.text_cond['vector'][0] = vector[indexes]
-                indexes = torch.randperm(cross.size(0))
-                params.text_cond['crossattn'][0] = cross[indexes]
-                del vector, cross, indexes
-
-            if params.sampling_step >= self.shuffleNeg * lastStep:
-                vector, cross = neg['vector'][0], neg['crossattn'][0]
-                indexes = torch.randperm(vector.size(0))
-                params.text_uncond['vector'][0] = vector[indexes]
-                indexes = torch.randperm(cross.size(0))
-                params.text_uncond['crossattn'][0] = cross[indexes]
-                del vector, cross, indexes
-
-            pos = params.text_cond
-            neg = params.text_uncond
-
-            #   weight
-            if self.scalePos != 1.0:
-                cond, cross = pos['vector'][0], pos['crossattn'][0]
-                empty_cond, empty_cross = self.empty_cond['vector'], self.empty_cond['crossattn']
-                print (cond.size(), empty_cond.size())
-                print (cross.size(), empty_cross.size())
-                empty_cond.resize_as_(cond)     #is this necessary? should be same anyway?
-                empty_cross.resize_as_(cross)
-                empty_cond = torch.reshape(empty_cond, cond.shape)
-                empty_cross = torch.reshape(empty_cross, cross.shape)
-                torch.lerp(empty_cond, cond, self.scalePos, out=cond)
-                torch.lerp(empty_cross, cross, self.scalePos, out=cross)
-                params.text_cond['vector'][0] = cond
-                params.text_cond['crossattn'][0] = cross
-                del cond, cross, empty_cond, empty_cross
-            del pos
-
-            if self.scaleNeg != 1.0:
-                uncond, cross = neg['vector'][0], neg['crossattn'][0]
-                empty_uncond, empty_cross = self.empty_uncond['vector'], self.empty_uncond['crossattn']
-                empty_uncond.resize_as_(uncond)
-                empty_cross.resize_as_(cross)
-                empty_uncond = torch.reshape(empty_uncond, uncond.shape)
-                empty_cross = torch.reshape(empty_cross, cross.shape)
-                torch.lerp(empty_uncond, uncond, self.scaleNeg, out=uncond)
-                torch.lerp(empty_cross, cross, self.scaleNeg, out=cross)
-                params.text_uncond['vector'][0] = uncond
-                params.text_uncond['crossattn'][0] = cross
-                del uncond, cross, empty_uncond, empty_cross
-            del neg
-
-            #   batch: copy shuffled/scaled results
-            i = 1
-            while i < len(params.text_cond['vector']):
-                params.text_cond['vector'][i] = params.text_cond['vector'][0]
-                params.text_cond['crossattn'][i] = params.text_cond['crossattn'][0]
-                params.text_uncond['vector'][i] = params.text_uncond['vector'][0]
-                params.text_uncond['crossattn'][i] = params.text_uncond['crossattn'][0]
-                i += 1
+            # positive conds
+            if self.zeroPos < 1.0 or self.shufflePos < 1.0 or self.noisePos > 0.0 or self.scalePos != 1.0:
+                cross = params.text_cond['crossattn'][0]
+                empty_cross = self.empty_cond['crossattn'].resize_as_(cross).reshape(cross.shape)
+                if self.zeroPos * lastStep < params.sampling_step:
+                    cross = empty_cross
+                else:
+                    if self.shufflePos * lastStep < params.sampling_step:
+                        indexes = torch.randperm(cross.size(0))
+                        cross = cross[indexes]
+                        del indexes
+                    if self.noisePos > 0.0:
+                        noise = torch.randn_like(cross)
+                        torch.lerp(cross, noise, self.noisePos, out=cross)
+                        del noise
+                    if self.scalePos != 1.0:
+                        torch.lerp(empty_cross, cross, self.scalePos, out=cross)
+                del empty_cross
+                if batchSize == 1:
+                    params.text_cond['crossattn'][0] = cross
+                else:
+                    params.text_cond['crossattn'] = cross.repeat(batchSize)
+                del cross
+            
+            # negative conds
+            if self.zeroNegS > 0.0 or self.zeroNegE < 1.0 or self.shuffleNeg < 1.0 or self.noiseNeg > 0.0 or self.scaleNeg != 1.0:
+                cross = params.text_uncond['crossattn'][0]
+                empty_cross = self.empty_uncond['crossattn'].resize_as_(cross).reshape(cross.shape)
+                if self.zeroNegS * lastStep > params.sampling_step or self.zeroNegE * lastStep < params.sampling_step:
+                    cross = empty_cross
+                else:
+                    #   shuffle
+                    if self.shuffleNeg * lastStep < params.sampling_step:
+                        indexes = torch.randperm(cross.size(0))
+                        cross = cross[indexes]
+                        del indexes
+                    #noise
+                    if self.noiseNeg > 0.0:
+                        noise = torch.randn_like(cross)
+                        torch.lerp(cross, noise, self.noiseNeg, out=cross)
+                        del noise
+                    #   weight
+                    if self.scaleNeg != 1.0:
+                        torch.lerp(empty_cross, cross, self.scaleNeg, out=cross)
+                del empty_cross
+                
+                if batchSize == 1:
+                    params.text_uncond['crossattn'][0] = cross
+                else:
+                    params.text_uncond['crossattn'] = cross.repeat(batchSize)
+                del cross
 
         else:   #   not sdXL
-            pos = params.text_cond[0]
-            neg = params.text_uncond[0]
+            #   positive
+            if self.zeroPos < 1.0 or self.shufflePos < 1.0 or self.noisePos > 0.0 or self.scalePos != 1.0:
+                cond = params.text_cond[0]
+                empty = self.empty_cond.resize_as_(cond).reshape(cond.shape)
 
-            #   shuffle
-            if params.sampling_step >= self.shufflePos * lastStep:
-                indexes = torch.randperm(pos.size(0))
-                params.text_cond[0] = pos[indexes]
-                del indexes
+                if self.zeroPos * lastStep < params.sampling_step:
+                    cond = empty
+                else:
+                    #   shuffle
+                    if self.shufflePos * lastStep < params.sampling_step:
+                        indexes = torch.randperm(cond.size(0))
+                        cond = cond[indexes]
+                        del indexes
 
-                if self.scalePos == 1.0:   #   filthy hack
-                    self.scalePos = 0.999
+                        if self.scalePos == 1.0:   #   filthy hack
+                            self.scalePos = 0.999
 
-            if params.sampling_step >= self.shuffleNeg * lastStep:
-                indexes = torch.randperm(neg.size(0))
-                params.text_uncond[0] = neg[indexes]
-                del indexes
+                    #noise - should noise be same for all steps? maybe can't be, due to prompt editing
+                    if self.noisePos > 0.0:
+                        noise = torch.randn_like(cond)
+                        torch.lerp(cond, noise, self.noisePos, out=cond)
+                        del noise
 
-                if self.scaleNeg == 1.0:
-                    self.scaleNeg = 0.999
+                    #   weight
+                    if self.scalePos != 1.0:
+                        torch.lerp(empty, cond, self.scalePos, out=cond)
+                        del empty
+                if batchSize == 1:
+                    params.text_cond[0] = cond
+                else:
+                    params.text_cond = cond.repeat(batchSize)
+                del cond
 
-            pos = params.text_cond[0]
-            neg = params.text_uncond[0]
+            #   negative
+            if self.zeroNegS > 0.0 or self.zeroNegE < 1.0 or self.shuffleNeg < 1.0 or self.noiseNeg > 0.0 or self.scaleNeg != 1.0:
+                cond = params.text_uncond[0]
+                empty = self.empty_uncond.resize_as_(cond).reshape(cond.shape)
 
-            #   weight
-            if self.scalePos != 1.0:
-                empty = self.empty_cond
-                empty.resize_as_(pos)
-                empty = torch.reshape(empty, pos.shape)
-                torch.lerp(empty, pos, self.scalePos, out=params.text_cond[0])
-                del empty
-            del pos
+                if self.zeroNegS * lastStep > params.sampling_step or self.zeroNegE * lastStep < params.sampling_step:
+                    cond = empty
+                else:
+                    #   shuffle
+                    if self.shuffleNeg * lastStep < params.sampling_step:
+                        indexes = torch.randperm(cond.size(0))
+                        cond = cond[indexes]
+                        del indexes
 
-            if self.scaleNeg != 1.0:
-                self.empty_uncond.resize_as_(neg)
-                self.empty_uncond = torch.reshape(self.empty_uncond, neg.shape)
-                torch.lerp(self.empty_uncond, neg, self.scaleNeg, out=params.text_uncond[0])
-            del neg
+                        if self.scaleNeg == 1.0:   #   filthy hack
+                            self.scaleNeg = 0.999
 
-#   lazy ...
-            if params.sampling_step >= self.zeroPos * lastStep:
-                params.text_cond = torch.zeros_like(params.text_cond)
-            if params.sampling_step >= self.zeroNeg * lastStep:
-                params.text_uncond = torch.zeros_like(params.text_uncond)
+                    #noise - should noise be same for all steps? maybe can't be, due to prompt editing
+                    if self.noiseNeg > 0.0:
+                        noise = torch.randn_like(cond)
+                        torch.lerp(cond, noise, self.noiseNeg, out=cond)
+                        del noise
 
+                    #   weight
+                    if self.scaleNeg != 1.0:
+                        torch.lerp(empty, cond, self.scaleNeg, out=cond)
+                        del empty
 
-            #   batch: copy shuffled/scaled results
-            i = 1
-            while i < len(params.text_cond):
-                params.text_cond[i] = params.text_cond[0]
-                params.text_uncond[i] = params.text_uncond[0]
-                i += 1
-
+                if batchSize == 1:
+                    params.text_uncond[0] = cond
+                else:
+                    params.text_uncond = cond.repeat(batchSize)
+                del cond
 
 
     def process(self, params, *script_args, **kwargs):
-        enabled, shufflePos, shuffleNeg, scalePos, scaleNeg, zeroPos, zeroNeg = script_args
-        if not enabled:
-            return
+        enabled, shufflePos, shuffleNeg, noisePos, noiseNeg, scalePos, scaleNeg, zeroPos, zeroNegS, zeroNegE = script_args
+        if enabled:
+            self.shufflePos = shufflePos
+            self.shuffleNeg = shuffleNeg
+            self.noisePos = noisePos
+            self.noiseNeg = noiseNeg
+            self.scalePos = scalePos
+            self.scaleNeg = scaleNeg
+            self.zeroPos = zeroPos
+            self.zeroNegS = zeroNegS
+            self.zeroNegE = zeroNegE
 
-        self.shufflePos = shufflePos
-        self.shuffleNeg = shuffleNeg
-        self.scalePos = scalePos
-        self.scaleNeg = scaleNeg
-        self.zeroPos = zeroPos
-        self.zeroNeg = zeroNeg
+            # Below codes will add some logs to the texts below the image outputs on UI.
+            params.extra_generation_params.update(dict(
+                cb_enabled = enabled,
+                cb_shufflePos = shufflePos,
+                cb_shuffleNeg = shuffleNeg,
+                cb_noisePos = noisePos,
+                cb_noiseNeg = noiseNeg,
+                cb_scalePos = scalePos,
+                cb_scaleNeg = scaleNeg,
+                cb_zeroPos = zeroPos,
+                cb_zeroNegS = zeroNegS,
+                cb_zeroNegE = zeroNegE,
+            ))
 
-        # Below codes will add some logs to the texts below the image outputs on UI.
-        params.extra_generation_params.update(dict(
-            cb_enabled = enabled,
-            cb_shufflePos = shufflePos,
-            cb_shuffleNeg = shuffleNeg,
-            cb_scalePos = scalePos,
-            cb_scaleNeg = scaleNeg,
-            cb_zeroPos = zeroPos,
-            cb_zeroNeg = zeroNeg,
-        ))
-
-        on_cfg_denoiser(self.denoiser_callback) #here, or in process
+            on_cfg_denoiser(self.denoiser_callback)
 
         return
 

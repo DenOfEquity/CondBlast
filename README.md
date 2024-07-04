@@ -11,12 +11,16 @@ Settings used are saved with metadata, and restored from loading through the **P
 Steps to start shuffling are selected as a proportion of the way through the diffusion process: 0.0 is the first step, 1.0 is last, 1.01 is never. 
 Each step from that point will receive a new shuffle.
 Scaling the text conditionings is based on the idea on the idea of the [Negative Prompt Weight extension by muerrilla](https://github.com/muerrilla/stable-diffusion-NPW).
+Idea to add noise from [this person with many names](https://github.com/thderoo).
+Order of actions is: shuffle, noise, weight, zero.
 
 ---
-#### update 25/06/2024 ####
-corrected location to write extra generation params, now they get added to *params.txt* too
+#### 03/07/2024 ####
+* options to add noise
 
-added option to zero text conds after number of steps
+#### 25/06/2024 ####
+* corrected location to write extra generation params, now they get added to *params.txt* too
+* added option to zero text conds after number of steps
 
 
 ---
@@ -24,4 +28,4 @@ added option to zero text conds after number of steps
 Public domain. Unlicense. Free to a good home.
 All terrible code is my own. Use at your own risk, read the code.
 
-> Written with [StackEdit](https://stackedit.io/).
+
