@@ -2,19 +2,24 @@
 ### extension for Forge webui for Stable Diffusion ###
 ---
 ## Basic usage ##
-It's a simple UI. Select the sampling step when to start shuffling the text conditionings.
-Also, you have the option to scale the text conditionings towards/away from an empty conditioning. This happens *after* any shuffling.
+It's a simple UI. Experiment. Changes to Negative are most useful.
+
+Can improve details and contrast.
+
 Settings used are saved with metadata, and restored from loading through the **PNG Info** tab.
 
 ---
-## Advanced / Details ##
-Steps to start shuffling are selected as a proportion of the way through the diffusion process: 0.0 is the first step, 1.0 is last, 1.01 is never. 
-Each step from that point will receive a new shuffle.
-Scaling the text conditionings is based on the idea on the idea of the [Negative Prompt Weight extension by muerrilla](https://github.com/muerrilla/stable-diffusion-NPW).
-Idea to add noise from [this person with many names](https://github.com/thderoo).
-Order of actions is: shuffle, noise, weight, zero.
+## Details ##
+Scaling the text conditionings is based on the idea of the [Negative Prompt Weight extension by muerrilla](https://github.com/muerrilla/stable-diffusion-NPW).
+
+Idea to add noise from [this person with many names](https://github.com/thderoo). Adding noise to the negative (text unconds) is essentially the idea behind Independant Condition Guidance.
+
+Order of actions is: empty (overrides others), blend (neg only), noise, shuffle, weight.
 
 ---
+#### 11/01/2025 ####
+various updates
+
 #### 03/07/2024 ####
 * options to add noise
 
