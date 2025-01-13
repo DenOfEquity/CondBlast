@@ -82,6 +82,9 @@ class CondBlastForge(scripts.Script):
 
     @torch.no_grad()
     def denoiser_callback(self, params):
+        if getattr (CondBlastForge, 'empty_cond', None) is None:
+            return
+
         is_SDXL = isinstance (params.text_cond, dict)
         lastStep = params.total_sampling_steps - 1
         batchSize = len(params.text_cond['vector']) if is_SDXL else len(params.text_cond)
@@ -90,10 +93,10 @@ class CondBlastForge(scripts.Script):
         if self.zeroPos < 1.0 or self.shufflePos < 1.0 or (self.noisePos > 0.0 and self.noisePosS < 1.0) or self.scalePos != 1.0:
             if is_SDXL:
                 cond = params.text_cond['crossattn'][0]
-                empty = self.empty_cond['crossattn'].resize_as_(cond).reshape(cond.shape)
+                empty = CondBlastForge.empty_cond['crossattn'].resize_as_(cond).reshape(cond.shape)
             else:
                 cond = params.text_cond[0]
-                empty = self.empty_cond.resize_as_(cond).reshape(cond.shape)
+                empty = CondBlastForge.empty_cond.resize_as_(cond).reshape(cond.shape)
                 
             if self.zeroPos * lastStep < params.sampling_step:
                 cond = empty
@@ -125,13 +128,18 @@ class CondBlastForge(scripts.Script):
             del cond
 
         ##  NEGATIVE
+        if getattr (params, 'text_uncond', None) is None:
+            return
+        if getattr (CondBlastForge, 'empty_uncond', None) is None:
+            return
+        
         if self.zeroNegS > 0.0 or self.zeroNegE < 1.0 or self.shuffleNeg < 1.0 or (self.noiseNeg > 0.0 and self.noiseNegS < 1.0)  or self.scaleNeg != 1.0 or (self.posNeg > 0.0 and self.posNegS < 1.0):
-            if is_SDXL and hasattr (params, 'text_uncond'):
+            if is_SDXL:
                 cond = params.text_uncond['crossattn'][0]
-                empty = self.empty_uncond['crossattn'].resize_as_(cond).reshape(cond.shape)
+                empty = CondBlastForge.empty_uncond['crossattn'].resize_as_(cond).reshape(cond.shape)
             else:
                 cond = params.text_uncond[0]
-                empty = self.empty_uncond.resize_as_(cond).reshape(cond.shape)
+                empty = CondBlastForge.empty_uncond.resize_as_(cond).reshape(cond.shape)
                 
             if self.zeroNegS * lastStep > params.sampling_step or self.zeroNegE * lastStep < params.sampling_step:
                 cond = empty
@@ -222,14 +230,16 @@ class CondBlastForge(scripts.Script):
 
         if enabled:
             prompt = SdConditioning([""], is_negative_prompt=True, width=params.width, height=params.height)
-            self.empty_uncond = shared.sd_model.get_learned_conditioning(prompt)
+            CondBlastForge.empty_uncond = shared.sd_model.get_learned_conditioning(prompt)
             prompt = SdConditioning([""], is_negative_prompt=False, width=params.width, height=params.height)
-            self.empty_cond = shared.sd_model.get_learned_conditioning(prompt)
+            CondBlastForge.empty_cond = shared.sd_model.get_learned_conditioning(prompt)
 
         return
 
 
     def postprocess(self, params, processed, *args):
+        CondBlastForge.empty_uncond = None
+        CondBlastForge.empty_cond = None
         remove_current_script_callbacks()
         return
 
