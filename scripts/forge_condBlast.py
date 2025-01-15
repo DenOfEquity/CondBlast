@@ -150,8 +150,18 @@ class CondBlastForge(scripts.Script):
                         pos_cond = params.text_cond['crossattn'][0]
                     else:
                         pos_cond = params.text_cond[0]
-                    size = min(pos_cond.shape[0], cond.shape[0])
-                    torch.lerp(cond[:size], pos_cond[:size], self.posNeg, out=cond)
+                        
+                    if pos_cond.shape[0] > cond.shape[0]:
+                        # positive longer than negative, just truncate
+                        pos_cond = pos_cond[:cond.shape[0]]
+                    elif pos_cond.shape[0] < cond.shape[0]:
+                        # negative longer than positive, expand positive with zero
+                        new_cond = torch.zeros_like(cond)
+                        new_cond[:pos_cond.shape[0], :] = pos_cond
+                        pos_cond = new_cond
+                        del new_cond
+
+                    torch.lerp(cond, pos_cond, self.posNeg, out=cond)
                     del pos_cond
             
                 #   noise
