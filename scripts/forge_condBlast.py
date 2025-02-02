@@ -9,8 +9,6 @@ import torch, math, random, time
 from modules.ui_components import InputAccordion
 
 
-#   shuffling and scaling text conds
-
 class CondBlastForge(scripts.Script):
     def __init__(self):
         self.empty_uncond = None    #   specifically, a negative text conditioning
@@ -83,7 +81,10 @@ class CondBlastForge(scripts.Script):
     @torch.no_grad()
     def denoiser_callback(self, params):
         if getattr (CondBlastForge, 'empty_cond', None) is None:
-            return
+            prompt = SdConditioning([""], is_negative_prompt=True, width=1024, height=1024)
+            CondBlastForge.empty_uncond = shared.sd_model.get_learned_conditioning(prompt)
+            prompt = SdConditioning([""], is_negative_prompt=False, width=1024, height=1024)
+            CondBlastForge.empty_cond = shared.sd_model.get_learned_conditioning(prompt)
 
         is_SDXL = isinstance (params.text_cond, dict)
         lastStep = params.total_sampling_steps - 1
