@@ -11,8 +11,8 @@ from modules.ui_components import InputAccordion
 
 class CondBlastForge(scripts.Script):
     def __init__(self):
-        self.empty_uncond = None    #   specifically, a negative text conditioning
-        self.empty_cond = None      #   specifically, a positive text conditioning
+        self.empty_uncond = None
+        self.empty_cond = None
 
     def title(self):
         return "Cond Blastr"
@@ -81,10 +81,12 @@ class CondBlastForge(scripts.Script):
     @torch.no_grad()
     def denoiser_callback(self, params):
         if getattr (CondBlastForge, 'empty_cond', None) is None:
-            prompt = SdConditioning([""], is_negative_prompt=True, width=1024, height=1024)
+            # partial workaround for BMAB blocking process_before_every_sampling
+            prompt = SdConditioning([""], is_negative_prompt=True, width=params.width, height=params.height)
             CondBlastForge.empty_uncond = shared.sd_model.get_learned_conditioning(prompt)
-            prompt = SdConditioning([""], is_negative_prompt=False, width=1024, height=1024)
+            prompt = SdConditioning([""], is_negative_prompt=False, width=params.width, height=params.height)
             CondBlastForge.empty_cond = shared.sd_model.get_learned_conditioning(prompt)
+            return
 
         is_SDXL = isinstance (params.text_cond, dict)
         lastStep = params.total_sampling_steps - 1
@@ -94,10 +96,14 @@ class CondBlastForge(scripts.Script):
         if self.zeroPos < 1.0 or self.shufflePos < 1.0 or (self.noisePos > 0.0 and self.noisePosS < 1.0) or self.scalePos != 1.0:
             if is_SDXL:
                 cond = params.text_cond['crossattn'][0]
-                empty = CondBlastForge.empty_cond['crossattn'].resize_as_(cond).reshape(cond.shape)
+                empty = CondBlastForge.empty_cond['crossattn'][0]
             else:
                 cond = params.text_cond[0]
-                empty = CondBlastForge.empty_cond.resize_as_(cond).reshape(cond.shape)
+                empty = CondBlastForge.empty_cond[0]
+
+            resize = cond.shape[0] // empty.shape[0]
+            if resize > 1:
+                empty = empty.repeat(resize, 1)
                 
             if self.zeroPos * lastStep < params.sampling_step:
                 cond = empty
@@ -137,10 +143,14 @@ class CondBlastForge(scripts.Script):
         if self.zeroNegS > 0.0 or self.zeroNegE < 1.0 or self.shuffleNeg < 1.0 or (self.noiseNeg > 0.0 and self.noiseNegS < 1.0)  or self.scaleNeg != 1.0 or (self.posNeg > 0.0 and self.posNegS < 1.0):
             if is_SDXL:
                 cond = params.text_uncond['crossattn'][0]
-                empty = CondBlastForge.empty_uncond['crossattn'].resize_as_(cond).reshape(cond.shape)
+                empty = CondBlastForge.empty_uncond['crossattn'][0]
             else:
                 cond = params.text_uncond[0]
-                empty = CondBlastForge.empty_uncond.resize_as_(cond).reshape(cond.shape)
+                empty = CondBlastForge.empty_uncond[0]
+
+            resize = cond.shape[0] // empty.shape[0]
+            if resize > 1:
+                empty = empty.repeat(resize, 1)
                 
             if self.zeroNegS * lastStep > params.sampling_step or self.zeroNegE * lastStep < params.sampling_step:
                 cond = empty
@@ -151,18 +161,8 @@ class CondBlastForge(scripts.Script):
                         pos_cond = params.text_cond['crossattn'][0]
                     else:
                         pos_cond = params.text_cond[0]
-                        
-                    if pos_cond.shape[0] > cond.shape[0]:
-                        # positive longer than negative, just truncate
-                        pos_cond = pos_cond[:cond.shape[0]]
-                    elif pos_cond.shape[0] < cond.shape[0]:
-                        # negative longer than positive, expand positive with zero
-                        new_cond = torch.zeros_like(cond)
-                        new_cond[:pos_cond.shape[0], :] = pos_cond
-                        pos_cond = new_cond
-                        del new_cond
-
-                    torch.lerp(cond, pos_cond, self.posNeg, out=cond)
+                    size = min(pos_cond.shape[0], cond.shape[0])
+                    torch.lerp(cond[:size], pos_cond[:size], self.posNeg, out=cond)
                     del pos_cond
             
                 #   noise
@@ -239,12 +239,12 @@ class CondBlastForge(scripts.Script):
     def process_before_every_sampling(self, params, *script_args, **kwargs):
         enabled = script_args[0]
 
+        # must create empties here, in case model architecture is different for second pass
         if enabled:
             prompt = SdConditioning([""], is_negative_prompt=True, width=params.width, height=params.height)
             CondBlastForge.empty_uncond = shared.sd_model.get_learned_conditioning(prompt)
             prompt = SdConditioning([""], is_negative_prompt=False, width=params.width, height=params.height)
             CondBlastForge.empty_cond = shared.sd_model.get_learned_conditioning(prompt)
-
         return
 
 
