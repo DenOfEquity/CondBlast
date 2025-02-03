@@ -90,122 +90,116 @@ class CondBlastForge(scripts.Script):
 
         is_SDXL = isinstance (params.text_cond, dict)
         lastStep = params.total_sampling_steps - 1
+
         batchSize = len(params.text_cond['vector']) if is_SDXL else len(params.text_cond)
 
         ##  POSITIVE
         if self.zeroPos < 1.0 or self.shufflePos < 1.0 or (self.noisePos > 0.0 and self.noisePosS < 1.0) or self.scalePos != 1.0:
-            if is_SDXL:
-                cond = params.text_cond['crossattn'][0]
-                empty = CondBlastForge.empty_cond['crossattn'][0]
-            else:
-                cond = params.text_cond[0]
-                empty = CondBlastForge.empty_cond[0]
+            for i in range(batchSize):
+                if is_SDXL:
+                    cond = params.text_cond['crossattn'][i]
+                    empty = CondBlastForge.empty_cond['crossattn'][0].clone()
+                else:
+                    cond = params.text_cond[i]
+                    empty = CondBlastForge.empty_cond[0].clone()
 
-            resize = cond.shape[0] // empty.shape[0]
-            if resize > 1:
-                empty = empty.repeat(resize, 1)
-                
-            if self.zeroPos * lastStep < params.sampling_step:
-                cond = empty
-            else:
-                if self.noisePos > 0.0 and self.noisePosS * lastStep < params.sampling_step:
-                    noise = torch.randn_like(cond) * cond.std()
-                    torch.lerp(cond, noise, self.noisePos, out=cond)
-                    del noise
-                if self.shufflePos * lastStep < params.sampling_step:
-                    indexes = torch.randperm(cond.size(0))
-                    cond = cond[indexes]
-                    del indexes
-                if self.scalePos != 1.0:
-                    torch.lerp(empty, cond, self.scalePos, out=cond)
+                resize = cond.shape[0] // empty.shape[0]
+                if resize > 1:
+                    empty = empty.repeat(resize, 1)
+                    
+                if self.zeroPos * lastStep < params.sampling_step:
+                    cond = empty
+                else:
+                    if self.noisePos > 0.0 and self.noisePosS * lastStep < params.sampling_step:
+                        noise = torch.randn_like(cond) * cond.std()
+                        torch.lerp(cond, noise, self.noisePos, out=cond)
+                        del noise
+                    if self.shufflePos * lastStep < params.sampling_step:
+                        indexes = torch.randperm(cond.size(0))
+                        cond = cond[indexes]
+                        del indexes
+                    if self.scalePos != 1.0:
+                        torch.lerp(empty, cond, self.scalePos, out=cond)
 
-            del empty
+                del empty
             
-            if is_SDXL:
-                if batchSize == 1:
-                    params.text_cond['crossattn'][0] = cond
+                if is_SDXL:
+                    params.text_cond['crossattn'][i] = cond
                 else:
-                    params.text_cond['crossattn'] = cond.unsqueeze(0).repeat(batchSize, 1, 1)
-            else:
-                if batchSize == 1:
-                    params.text_cond[0] = cond
-                else:
-                    params.text_cond = cond.unsqueeze(0).repeat(batchSize, 1, 1)
+                    params.text_cond[i] = cond
 
-            del cond
+                del cond
 
         ##  NEGATIVE
         if getattr (params, 'text_uncond', None) is None:
             return
         if getattr (CondBlastForge, 'empty_uncond', None) is None:
             return
-        
+
+
+        batchSize = len(params.text_uncond['vector']) if is_SDXL else len(params.text_uncond)
+
         if self.zeroNegS > 0.0 or self.zeroNegE < 1.0 or self.shuffleNeg < 1.0 or (self.noiseNeg > 0.0 and self.noiseNegS < 1.0)  or self.scaleNeg != 1.0 or (self.posNeg > 0.0 and self.posNegS < 1.0):
-            if is_SDXL:
-                cond = params.text_uncond['crossattn'][0]
-                empty = CondBlastForge.empty_uncond['crossattn'][0]
-            else:
-                cond = params.text_uncond[0]
-                empty = CondBlastForge.empty_uncond[0]
+            for i in range(batchSize):
+                if is_SDXL:
+                    cond = params.text_uncond['crossattn'][i]
+                    empty = CondBlastForge.empty_uncond['crossattn'][0].clone()
+                else:
+                    cond = params.text_uncond[i]
+                    empty = CondBlastForge.empty_uncond[0].clone()
 
-            resize = cond.shape[0] // empty.shape[0]
-            if resize > 1:
-                empty = empty.repeat(resize, 1)
-                
-            if self.zeroNegS * lastStep > params.sampling_step or self.zeroNegE * lastStep < params.sampling_step:
-                cond = empty
-            else:
-                #   blend positive
-                if self.posNeg > 0.0 and self.posNegS * lastStep < params.sampling_step:
-                    if is_SDXL:
-                        pos_cond = params.text_cond['crossattn'][0]
-                    else:
-                        pos_cond = params.text_cond[0]
-
-                    if pos_cond.shape[0] > cond.shape[0]:
-                        # positive longer than negative, just truncate
-                        pos_cond = pos_cond[:cond.shape[0]]
-                    elif pos_cond.shape[0] < cond.shape[0]:
-                        # negative longer than positive, expand positive with zero
-                        new_cond = torch.zeros_like(cond)
-                        new_cond[:pos_cond.shape[0], :] = pos_cond
-                        pos_cond = new_cond
-                        del new_cond
-
-                    torch.lerp(cond, pos_cond, self.posNeg, out=cond)
-
-                    del pos_cond
-            
-                #   noise
-                if self.noiseNeg > 0.0 and self.noiseNegS * lastStep < params.sampling_step:
-                    noise = torch.randn_like(cond) * cond.std()
-                    torch.lerp(cond, noise, self.noiseNeg, out=cond)
-                    del noise
-            
-                #   shuffle
-                if self.shuffleNeg * lastStep < params.sampling_step:
-                    indexes = torch.randperm(cond.size(0))
-                    cond = cond[indexes]
-                    del indexes
-            
-                #   weight
-                if self.scaleNeg != 1.0:
-                    torch.lerp(empty, cond, self.scaleNeg, out=cond)
-
-            del empty
+                resize = cond.shape[0] // empty.shape[0]
+                if resize > 1:
+                    empty = empty.repeat(resize, 1)
                     
-            if is_SDXL:
-                if batchSize == 1:
-                    params.text_uncond['crossattn'][0] = cond
+                if self.zeroNegS * lastStep > params.sampling_step or self.zeroNegE * lastStep < params.sampling_step:
+                    cond = empty
                 else:
-                    params.text_uncond['crossattn'] = cond.unsqueeze(0).repeat(batchSize, 1, 1)
-            else:
-                if batchSize == 1:
-                    params.text_uncond[0] = cond
-                else:
-                    params.text_uncond = cond.unsqueeze(0).repeat(batchSize, 1, 1)
+                    #   blend positive
+                    if self.posNeg > 0.0 and self.posNegS * lastStep < params.sampling_step:
+                        if is_SDXL:
+                            pos_cond = params.text_cond['crossattn'][0]
+                        else:
+                            pos_cond = params.text_cond[0]
 
-            del cond
+                        if pos_cond.shape[0] > cond.shape[0]:
+                            # positive longer than negative, just truncate
+                            pos_cond = pos_cond[:cond.shape[0]]
+                        elif pos_cond.shape[0] < cond.shape[0]:
+                            # negative longer than positive, expand positive with zero
+                            new_cond = torch.zeros_like(cond)
+                            new_cond[:pos_cond.shape[0], :] = pos_cond
+                            pos_cond = new_cond
+                            del new_cond
+
+                        torch.lerp(cond, pos_cond, self.posNeg, out=cond)
+
+                        del pos_cond
+                
+                    #   noise
+                    if self.noiseNeg > 0.0 and self.noiseNegS * lastStep < params.sampling_step:
+                        noise = torch.randn_like(cond) * cond.std()
+                        torch.lerp(cond, noise, self.noiseNeg, out=cond)
+                        del noise
+                
+                    #   shuffle
+                    if self.shuffleNeg * lastStep < params.sampling_step:
+                        indexes = torch.randperm(cond.size(0))
+                        cond = cond[indexes]
+                        del indexes
+                
+                    #   weight
+                    if self.scaleNeg != 1.0:
+                        torch.lerp(empty, cond, self.scaleNeg, out=cond)
+
+                del empty
+                        
+                if is_SDXL:
+                    params.text_uncond['crossattn'][i] = cond
+                else:
+                    params.text_uncond[i] = cond
+
+                del cond
 
 
     def process(self, params, *script_args, **kwargs):
