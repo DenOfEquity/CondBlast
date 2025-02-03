@@ -125,12 +125,12 @@ class CondBlastForge(scripts.Script):
                 if batchSize == 1:
                     params.text_cond['crossattn'][0] = cond
                 else:
-                    params.text_cond['crossattn'] = cond.repeat(batchSize)
+                    params.text_cond['crossattn'] = cond.unsqueeze(0).repeat(batchSize, 1, 1)
             else:
                 if batchSize == 1:
                     params.text_cond[0] = cond
                 else:
-                    params.text_cond = cond.repeat(batchSize)
+                    params.text_cond = cond.unsqueeze(0).repeat(batchSize, 1, 1)
 
             del cond
 
@@ -198,12 +198,12 @@ class CondBlastForge(scripts.Script):
                 if batchSize == 1:
                     params.text_uncond['crossattn'][0] = cond
                 else:
-                    params.text_uncond['crossattn'] = cond.repeat(batchSize)
+                    params.text_uncond['crossattn'] = cond.unsqueeze(0).repeat(batchSize, 1, 1)
             else:
                 if batchSize == 1:
                     params.text_uncond[0] = cond
                 else:
-                    params.text_uncond = cond.repeat(batchSize)
+                    params.text_uncond = cond.unsqueeze(0).repeat(batchSize, 1, 1)
 
             del cond
 
