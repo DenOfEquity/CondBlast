@@ -102,6 +102,8 @@ class CondBlastForge(scripts.Script):
                 else:
                     cond = params.text_cond[i]
                     empty = CondBlastForge.empty_cond[0].clone()
+                if empty.ndim == 3:
+                    empty = empty[0]
 
                 resize = cond.shape[0] // empty.shape[0]
                 if resize > 1:
@@ -147,6 +149,8 @@ class CondBlastForge(scripts.Script):
                 else:
                     cond = params.text_uncond[i]
                     empty = CondBlastForge.empty_uncond[0].clone()
+                if empty.ndim == 3:
+                    empty = empty[0]
 
                 resize = cond.shape[0] // empty.shape[0]
                 if resize > 1:
