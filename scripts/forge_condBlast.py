@@ -141,7 +141,7 @@ class CondBlastForge(scripts.Script):
 
         batchSize = len(params.text_uncond['vector']) if is_SDXL else len(params.text_uncond)
 
-        if self.zeroNegS > 0.0 or self.zeroNegE < 1.0 or self.shuffleNeg < 1.0 or (self.noiseNeg > 0.0 and self.noiseNegS < 1.0)  or self.scaleNeg != 1.0 or (self.posNeg > 0.0 and self.posNegS < 1.0):
+        if self.zeroNegS > 0.0 or self.zeroNegE < 1.0 or self.shuffleNeg < 1.0 or (self.noiseNeg > 0.0 and self.noiseNegS < 1.0) or self.scaleNeg != 1.0 or (self.posNeg > 0.0 and self.posNegS < 1.0):
             for i in range(batchSize):
                 if is_SDXL:
                     cond = params.text_uncond['crossattn'][i]
@@ -162,9 +162,9 @@ class CondBlastForge(scripts.Script):
                     #   blend positive
                     if self.posNeg > 0.0 and self.posNegS * lastStep < params.sampling_step:
                         if is_SDXL:
-                            pos_cond = params.text_cond['crossattn'][0]
+                            pos_cond = params.text_cond['crossattn'][i]
                         else:
-                            pos_cond = params.text_cond[0]
+                            pos_cond = params.text_cond[i]
 
                         if pos_cond.shape[0] > cond.shape[0]:
                             # positive longer than negative, just truncate
