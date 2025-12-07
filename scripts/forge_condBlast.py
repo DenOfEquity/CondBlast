@@ -23,22 +23,26 @@ class CondBlastForge(scripts.Script):
         with InputAccordion(False, label=self.title()) as enabled:
             with gr.Accordion(open=False, label="controls for Positive"):
                 with gr.Row():
-                    noisePos = gr.Slider(minimum=0.0, maximum=1.0, step=0.001, value=0.0, label='add noise to text conds')
-                    noisePosS = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=0.0, label='noise after step')
-                shufflePos = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=1.0, label='shuffle text conds after step')
-                scalePos = gr.Slider(minimum=0.1, maximum=2.0, step=0.005, value=1.0, label='prompt weight')
+                    noisePos = gr.Slider(minimum=0.0, maximum=1.0, step=0.001, value=0.0, label='add noise')
+                    noisePosB = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=0.0, label='noise before step')
+                    noisePosA = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=1.0, label='noise after step')
                 with gr.Row():
-                    zeroPosS = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=0.0, label='empty positive before step')
-                    zeroPosE = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=1.0, label='empty positive after step')
-            with gr.Accordion(open=True, label="controls for Negative"):
+                    shufflePos = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=1.0, label='shuffle text conds after step')
+                    scalePos = gr.Slider(minimum=0.1, maximum=2.0, step=0.005, value=1.0, label='prompt weight')
+                with gr.Row():
+                    zeroPosB = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=0.0, label='empty positive before step')
+                    zeroPosA = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=1.0, label='empty positive after step')
+            with gr.Accordion(open=False, label="controls for Negative"):
                 with gr.Row():
                     posNeg   = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=0.0, label='blend positive into negative')
-                    posNegS = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=0.0, label='blend after step')
+                    posNegS = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=1.0, label='blend after step')
                 with gr.Row():
-                    noiseNeg = gr.Slider(minimum=0.0, maximum=1.0, step=0.001, value=0.0, label='add noise to text conds (ICG)')
-                    noiseNegS = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=0.0, label='noise after step')
-                shuffleNeg = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=1.0, label='shuffle text conds after step')
-                scaleNeg = gr.Slider(minimum=0.1, maximum=2.0, step=0.005, value=1.0, label='prompt weight')
+                    noiseNeg = gr.Slider(minimum=0.0, maximum=1.0, step=0.001, value=0.0, label='add noise (ICG)')
+                    noiseNegB = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=0.0, label='noise before step')
+                    noiseNegA = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=1.0, label='noise after step')
+                with gr.Row():
+                    shuffleNeg = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=1.0, label='shuffle text conds after step')
+                    scaleNeg = gr.Slider(minimum=0.1, maximum=2.0, step=0.005, value=1.0, label='prompt weight')
                 with gr.Row():
                     zeroNegS = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=0.0, label='empty negative before step')
                     zeroNegE = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, value=1.0, label='empty negative after step')
@@ -49,12 +53,14 @@ class CondBlastForge(scripts.Script):
         shuffleNeg.do_not_save_to_config = True
         noisePos.do_not_save_to_config = True
         noiseNeg.do_not_save_to_config = True
-        noisePosS.do_not_save_to_config = True
-        noiseNegS.do_not_save_to_config = True
+        noisePosB.do_not_save_to_config = True
+        noisePosA.do_not_save_to_config = True
+        noiseNegB.do_not_save_to_config = True
+        noiseNegA.do_not_save_to_config = True
         scalePos.do_not_save_to_config = True
         scaleNeg.do_not_save_to_config = True
-        zeroPosS.do_not_save_to_config = True
-        zeroPosE.do_not_save_to_config = True
+        zeroPosB.do_not_save_to_config = True
+        zeroPosA.do_not_save_to_config = True
         posNeg.do_not_save_to_config = True
         posNegS.do_not_save_to_config = True
         zeroNegS.do_not_save_to_config = True
@@ -66,19 +72,21 @@ class CondBlastForge(scripts.Script):
             (shuffleNeg, "cb_shuffleNeg"),
             (noisePos, "cb_noisePos"),
             (noiseNeg, "cb_noiseNeg"),
-            (noisePosS, "cb_noisePosS"),
-            (noiseNegS, "cb_noiseNegS"),
+            (noisePosB, "cb_noisePosB"),
+            (noisePosA, "cb_noisePosA"),
+            (noiseNegB, "cb_noiseNegB"),
+            (noiseNegA, "cb_noiseNegA"),
             (scalePos, "cb_scalePos"),
             (scaleNeg, "cb_scaleNeg"),
-            (zeroPosS,  "cb_zeroPosS"),
-            (zeroPosE,  "cb_zeroPosE"),
+            (zeroPosB,  "cb_zeroPosB"),
+            (zeroPosA,  "cb_zeroPosA"),
             (posNeg,   "cb_posNeg"),
             (posNegS,  "cb_posNegS"),
             (zeroNegS, "cb_zeroNegS"),
             (zeroNegE, "cb_zeroNegE"),
         ]
 
-        return enabled, shufflePos, shuffleNeg, noisePos, noiseNeg, noisePosS, noiseNegS, scalePos, scaleNeg, zeroPosS, zeroPosE, posNeg, posNegS, zeroNegS, zeroNegE
+        return enabled, shufflePos, shuffleNeg, noisePos, noiseNeg, noisePosB, noisePosA, noiseNegB, noiseNegA, scalePos, scaleNeg, zeroPosB, zeroPosA, posNeg, posNegS, zeroNegS, zeroNegE
 
     @torch.no_grad()
     def denoiser_callback(self, params):
@@ -92,10 +100,11 @@ class CondBlastForge(scripts.Script):
 
         is_dict = isinstance (params.text_cond, dict)
         lastStep = params.total_sampling_steps - 1
+        batchSize = len(params.text_uncond['crossattn']) if is_dict else len(params.text_uncond)
+        generators = [torch.Generator(device='cpu').manual_seed(self.all_seeds[b]) for b in range(batchSize)]
 
         ##  POSITIVE
-        if self.zeroPosS > 0.0 or self.zeroPosE < 1.0 or self.shufflePos < 1.0 or (self.noisePos > 0.0 and self.noisePosS < 1.0) or self.scalePos != 1.0:
-            batchSize = len(params.text_cond['crossattn']) if is_dict else len(params.text_cond)
+        if self.zeroPosB > 0.0 or self.zeroPosA < 1.0 or self.shufflePos < 1.0 or (self.noisePos > 0.0 and (self.noisePosB > 0.0 or self.noisePosA < 1.0)) or self.scalePos != 1.0:
             for i in range(batchSize):
                 if is_dict:
                     cond = params.text_cond['crossattn'][i]
@@ -108,14 +117,15 @@ class CondBlastForge(scripts.Script):
                 empty = empty.repeat(resize, 1)
                 empty = empty[:cond.shape[0]]
 
-                if self.zeroPosS * lastStep > params.sampling_step or self.zeroPosE * lastStep < params.sampling_step:
+                if params.sampling_step < self.zeroPosB * lastStep or params.sampling_step > self.zeroPosA * lastStep:
                     cond = empty
                 else:
-                    if self.noisePos > 0.0 and self.noisePosS * lastStep < params.sampling_step:
-                        noise = torch.randn_like(cond) * cond.std()
-                        torch.lerp(cond, noise, self.noisePos, out=cond)
+                    if self.noisePos > 0.0 and (params.sampling_step < self.noisePosB * lastStep or params.sampling_step > self.noisePosA * lastStep):
+                        # noise = torch.randn_like(cond) * cond.std()
+                        noise = torch.randn(cond.shape, generator=generators[i])
+                        torch.lerp(cond, noise.to(cond) * cond.std(), self.noisePos, out=cond)
                         del noise
-                    if self.shufflePos * lastStep < params.sampling_step:
+                    if params.sampling_step > self.shufflePos * lastStep:
                         indexes = torch.randperm(cond.size(0))
                         cond = cond[indexes]
                         del indexes
@@ -137,8 +147,7 @@ class CondBlastForge(scripts.Script):
         if getattr (CondBlastForge, 'empty_uncond', None) is None:
             return
 
-        if self.zeroNegS > 0.0 or self.zeroNegE < 1.0 or self.shuffleNeg < 1.0 or (self.noiseNeg > 0.0 and self.noiseNegS < 1.0) or self.scaleNeg != 1.0 or (self.posNeg > 0.0 and self.posNegS < 1.0):
-            batchSize = len(params.text_uncond['crossattn']) if is_dict else len(params.text_uncond)
+        if self.zeroNegS > 0.0 or self.zeroNegE < 1.0 or self.shuffleNeg < 1.0 or (self.noiseNeg > 0.0 and (self.noiseNegB > 0.0 or self.noiseNegA < 1.0)) or self.scaleNeg != 1.0 or (self.posNeg > 0.0 and self.posNegS < 1.0):
             for i in range(batchSize):
                 if is_dict:
                     cond = params.text_uncond['crossattn'][i]
@@ -151,11 +160,11 @@ class CondBlastForge(scripts.Script):
                 empty = empty.repeat(resize, 1)
                 empty = empty[:cond.shape[0]]
 
-                if self.zeroNegS * lastStep > params.sampling_step or self.zeroNegE * lastStep < params.sampling_step:
+                if params.sampling_step < self.zeroNegS * lastStep or params.sampling_step > self.zeroNegE * lastStep:
                     cond = empty
                 else:
                     #   blend positive
-                    if self.posNeg > 0.0 and self.posNegS * lastStep < params.sampling_step:
+                    if self.posNeg > 0.0 and params.sampling_step > self.posNegS * lastStep:
                         if is_dict:
                             pos_cond = params.text_cond['crossattn'][i]
                         else:
@@ -176,13 +185,14 @@ class CondBlastForge(scripts.Script):
                         del pos_cond
 
                     #   noise
-                    if self.noiseNeg > 0.0 and self.noiseNegS * lastStep < params.sampling_step:
-                        noise = torch.randn_like(cond) * cond.std()
-                        torch.lerp(cond, noise, self.noiseNeg, out=cond)
+                    if self.noiseNeg > 0.0 and (params.sampling_step < self.noiseNegB * lastStep or params.sampling_step > self.noiseNegA * lastStep):
+                        # noise = torch.randn_like(cond) * cond.std()
+                        noise = torch.randn(cond.shape, generator=generators[i])
+                        torch.lerp(cond, noise.to(cond) * cond.std(), self.noiseNeg, out=cond)
                         del noise
 
                     #   shuffle
-                    if self.shuffleNeg * lastStep < params.sampling_step:
+                    if params.sampling_step > self.shuffleNeg * lastStep:
                         indexes = torch.randperm(cond.size(0))
                         cond = cond[indexes]
                         del indexes
@@ -202,22 +212,25 @@ class CondBlastForge(scripts.Script):
 
 
     def process(self, params, *script_args, **kwargs):
-        enabled, shufflePos, shuffleNeg, noisePos, noiseNeg, noisePosS, noiseNegS, scalePos, scaleNeg, zeroPosS, zeroPosE, posNeg, posNegS, zeroNegS, zeroNegE = script_args
+        enabled, shufflePos, shuffleNeg, noisePos, noiseNeg, noisePosB, noisePosA, noiseNegB, noiseNegA, scalePos, scaleNeg, zeroPosB, zeroPosA, posNeg, posNegS, zeroNegS, zeroNegE = script_args
         if enabled:
             self.shufflePos = shufflePos
             self.shuffleNeg = shuffleNeg
             self.noisePos = noisePos
             self.noiseNeg = noiseNeg
-            self.noisePosS = noisePosS
-            self.noiseNegS = noiseNegS
+            self.noisePosB = noisePosB
+            self.noisePosA = noisePosA
+            self.noiseNegB = noiseNegB
+            self.noiseNegA = noiseNegA
             self.scalePos = scalePos
             self.scaleNeg = scaleNeg
-            self.zeroPosS  = zeroPosS
-            self.zeroPosE  = zeroPosE
+            self.zeroPosB  = zeroPosB
+            self.zeroPosA  = zeroPosA
             self.posNeg   = posNeg
             self.posNegS  = posNegS
             self.zeroNegS = zeroNegS
             self.zeroNegE = zeroNegE
+            self.all_seeds = params.all_seeds
 
             # Below codes will add some logs to the texts below the image outputs on UI.
             params.extra_generation_params.update(dict(
@@ -226,12 +239,14 @@ class CondBlastForge(scripts.Script):
                 cb_shuffleNeg = shuffleNeg,
                 cb_noisePos = noisePos,
                 cb_noiseNeg = noiseNeg,
-                cb_noisePosS = noisePosS,
-                cb_noiseNegS = noiseNegS,
+                cb_noisePosB = noisePosB,
+                cb_noisePosA = noisePosA,
+                cb_noiseNegB = noiseNegB,
+                cb_noiseNegA = noiseNegA,
                 cb_scalePos = scalePos,
                 cb_scaleNeg = scaleNeg,
-                cb_zeroPosS  = zeroPosS,
-                cb_zeroPosE  = zeroPosE,
+                cb_zeroPosB  = zeroPosB,
+                cb_zeroPosA  = zeroPosA,
                 cb_posNeg   = posNeg,
                 cb_posNegS  = posNegS,
                 cb_zeroNegS = zeroNegS,
