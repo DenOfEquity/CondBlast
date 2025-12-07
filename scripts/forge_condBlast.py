@@ -100,7 +100,7 @@ class CondBlastForge(scripts.Script):
 
         is_dict = isinstance (params.text_cond, dict)
         lastStep = params.total_sampling_steps - 1
-        batchSize = len(params.text_uncond['crossattn']) if is_dict else len(params.text_uncond)
+        batchSize = len(params.text_cond['crossattn']) if is_dict else len(params.text_cond)
         generators = [torch.Generator(device='cpu').manual_seed(self.all_seeds[b]) for b in range(batchSize)]
 
         ##  POSITIVE
