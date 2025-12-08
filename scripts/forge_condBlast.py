@@ -110,7 +110,7 @@ class CondBlastForge(scripts.Script):
                     cond = params.text_cond['crossattn'][i]
                     empty = CondBlastForge.empty_cond['crossattn'][0].clone()
                 else:
-                    cond = params.text_cond[i][0]
+                    cond = params.text_cond[i]
                     empty = CondBlastForge.empty_cond[0][0].clone()
 
                 resize = 1 + (cond.shape[0] // empty.shape[0])
@@ -121,7 +121,6 @@ class CondBlastForge(scripts.Script):
                     cond = empty
                 else:
                     if self.noisePos > 0.0 and (params.sampling_step < self.noisePosB * lastStep or params.sampling_step > self.noisePosA * lastStep):
-                        # noise = torch.randn_like(cond) * cond.std()
                         noise = torch.randn(cond.shape, generator=generators[i])
                         torch.lerp(cond, noise.to(cond) * cond.std(), self.noisePos, out=cond)
                         del noise
@@ -137,7 +136,7 @@ class CondBlastForge(scripts.Script):
                 if is_dict:
                     params.text_cond['crossattn'][i] = cond
                 else:
-                    params.text_cond[i][0] = cond
+                    params.text_cond[i] = cond
 
                 del cond
 
@@ -153,7 +152,7 @@ class CondBlastForge(scripts.Script):
                     cond = params.text_uncond['crossattn'][i]
                     empty = CondBlastForge.empty_uncond['crossattn'][0].clone()
                 else:
-                    cond = params.text_uncond[i][0]
+                    cond = params.text_uncond[i]
                     empty = CondBlastForge.empty_uncond[0][0].clone()
 
                 resize = 1 + (cond.shape[0] // empty.shape[0])
@@ -186,7 +185,6 @@ class CondBlastForge(scripts.Script):
 
                     #   noise
                     if self.noiseNeg > 0.0 and (params.sampling_step < self.noiseNegB * lastStep or params.sampling_step > self.noiseNegA * lastStep):
-                        # noise = torch.randn_like(cond) * cond.std()
                         noise = torch.randn(cond.shape, generator=generators[i])
                         torch.lerp(cond, noise.to(cond) * cond.std(), self.noiseNeg, out=cond)
                         del noise
@@ -206,7 +204,7 @@ class CondBlastForge(scripts.Script):
                 if is_dict:
                     params.text_uncond['crossattn'][i] = cond
                 else:
-                    params.text_uncond[i][0] = cond
+                    params.text_uncond[i] = cond
 
                 del cond
 
@@ -260,8 +258,8 @@ class CondBlastForge(scripts.Script):
     def process_before_every_sampling(self, params, *script_args, **kwargs):
         enabled = script_args[0]
 
-        # must create empties here, in case model architecture is different for second pass
-        if enabled:
+        if enabled and params.iteration == 0:
+            # must create empties here, in case model architecture is different for second pass
             prompt = SdConditioning([""], is_negative_prompt=True, width=params.width, height=params.height)
             CondBlastForge.empty_uncond = shared.sd_model.get_learned_conditioning(prompt)
             prompt = SdConditioning([""], is_negative_prompt=False, width=params.width, height=params.height)
@@ -274,4 +272,3 @@ class CondBlastForge(scripts.Script):
         CondBlastForge.empty_cond = None
         remove_current_script_callbacks()
         return
-
